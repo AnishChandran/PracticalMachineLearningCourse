@@ -1,0 +1,136 @@
+---
+title: "Project"
+author: "Anish"
+date: "1/22/2018"
+output: html_document
+---
+
+# PRACTICAL MACHINE LEARNING PROJECT 
+
+## OBJECTIVE  
+
+The objective of this project is to make use of the data from accelerometers on the belt, forearm, arm and dumbell of 6 participants to predict the manner in which they did the exercise
+
+## DATA PREPROCESSING  
+
+Loading required packages
+
+```{r}
+library(caret)
+library(rpart)
+```
+
+Reading the data from the training and testing csv files
+
+```{r}
+training = read.csv("/Users/anish-zt70/Downloads/SONGS/pml-training.csv")
+test = read.csv("/Users/anish-zt70/Downloads/SONGS/pml-testing.csv")
+```
+
+Setting the seed , so that the experiment can be reproduced
+
+```{r}
+set.seed(10)
+```
+
+Creating the training and validation data 
+
+```{r}
+inTrain <- createDataPartition(y=training$classe, p=0.7, list=FALSE)
+trainData <- training[inTrain, ]
+crossValidData <- training[-inTrain, ]
+```
+
+### PreProcessing
+
+Removing the columns that doesn't provide much information for prediction such as user_name, raw_timestamp_part1 etc
+
+```{r}
+trainData <- trainData[,-c(1:7)]
+```
+
+Removing the columns that have near zero variance since it doesn't have much statistical importance
+
+```{r}
+nzVar <- nearZeroVar(trainData)
+trainData <- trainData[, -nzVar]
+```
+
+Removing columns which have "na" values in it 
+
+```{r}
+naColumns <- colSums(is.na(trainData)) == 0
+trainData <- trainData[, naColumns]
+```
+
+```{r}
+head(trainData)
+```
+
+Obtaining the column information from training set so that they can be used in the cross validation data set also
+
+```{r}
+trainingColumns <- colnames(trainData)
+crossValidData <- crossValidData[, trainingColumns]
+```
+
+### GBM Model
+
+Tried using the gradient boosting method by adjusting the default parameters to predict the data in a minimal time
+
+```{r}
+trControl <- trainControl(method = "cv", number = 2)
+```
+
+Training the GBM Model
+
+```{r}
+fitGBM <- train(classe ~ ., data=trainData, method = "gbm", trControl=trControl)
+fitGBM$finalModel
+```
+
+Using the model to predict the outputs
+
+```{r}
+predGBM <- predict(fitGBM, crossValidData)
+confusionMatrix(crossValidData$classe, predGBM)$overall[1]
+```
+
+The accuracy obtained using the above method is 
+```{r}
+confusionMatrix(crossValidData$classe, predGBM)$overall[1]
+```
+
+### Random Forest Model
+
+Replacing random forest instead of GBM to see the predictions in the above mode
+
+```{r}
+fitRf <- train(classe ~ ., data=trainData, method = "rf", trControl=trControl)
+fitRf$finalModel
+predRf <- predict(fitRf, crossValidData)
+confusionMatrix(crossValidData$classe, predRf)
+```
+
+The accuracy obtained using the Random Forest method is 
+
+```{r}
+confusionMatrix(crossValidData$classe, predRf)$overall[1]
+```
+
+### Storing the predicted Values
+
+```{r}
+predRf <- as.character(predRf)
+writeFiles <- function(x) {
+  n <- length(x)
+  for(i in 1:n) {
+    filename <- paste0("problem_id_", i, ".txt")
+    write.table(x[i], file=filename, quote=F, row.names=F, col.names=F)
+  }
+}
+```
+
+```{r}
+writeFiles(predRf)
+```
